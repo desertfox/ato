@@ -53,7 +53,7 @@ func turtle(i map[interface{}]interface{}, offset int) {
 			fmt.Printf("%sproperties:\n", pad(padLevel(offset)))
 			turtle(v.(map[interface{}]interface{}), padLevel(offset+2))
 		default:
-			fmt.Printf("unkown type: %T", v)
+			fmt.Printf("unknown type: %T", v)
 		}
 	}
 }
