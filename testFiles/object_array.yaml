@@ -1,0 +1,5 @@
+top:
+  - plain string
+  - 0
+  - complex:
+      name: plain string
