@@ -24,6 +24,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	prefixOpenAPI()
+
 	var ansibleData map[interface{}]interface{}
 	err = yaml.Unmarshal(b, &ansibleData)
 	if err != nil {
@@ -31,7 +33,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	turtle(ansibleData, 0)
+	turtle(ansibleData, 10)
+}
+
+func prefixOpenAPI() {
+	fmt.Println(`schema:
+  openAPIV3Schema:
+    type: object
+    properties:
+      spec:
+	type: object
+	properties:`)
 }
 
 //But of course the world is flat and resting on the shell of a giant turtle.
