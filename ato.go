@@ -4,13 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 
 	yaml "gopkg.in/yaml.v2"
 )
 
-type Type struct {
-	Type string `yaml:"type"`
+type T struct {
+	Type       string      `yaml:"type"`
+	Properties interface{} `yaml:"properties,omitempty"`
 }
 
 func main() {
@@ -28,7 +30,12 @@ func main() {
 
 	newCRD := migrateCRD(oldCRD, schema)
 
-	fmt.Printf("%v", newCRD)
+	b, err := yaml.Marshal(newCRD)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(b))
 }
 
 func migrateCRD(crd map[interface{}]interface{}, openAPIschema map[interface{}]interface{}) map[interface{}]interface{} {
@@ -45,19 +52,9 @@ func migrateCRD(crd map[interface{}]interface{}, openAPIschema map[interface{}]i
 	return crd
 }
 
-type O struct {
-	Type       string      `yaml:"type"`
-	Properties interface{} `yaml:"properties"`
-}
-
 func updateCRD(oas map[interface{}]interface{}) map[interface{}]interface{} {
-	var spec map[interface{}]interface{} = make(map[interface{}]interface{})
-	spec["type"] = "object"
-	spec["properties"] = oas
-
-	var openAPIschema map[interface{}]interface{} = make(map[interface{}]interface{})
-	openAPIschema["type"] = "object"
-	openAPIschema["properties"] = spec
+	spec := T{"object", oas}
+	openAPIschema := T{"object", spec}
 
 	var schema map[interface{}]interface{} = make(map[interface{}]interface{})
 	schema["openAPIV3Schema"] = openAPIschema
@@ -68,57 +65,23 @@ func updateCRD(oas map[interface{}]interface{}) map[interface{}]interface{} {
 //But of course the world is flat and resting on the shell of a giant turtle.
 func turtle(i map[interface{}]interface{}) map[interface{}]interface{} {
 	var collect map[interface{}]interface{} = make(map[interface{}]interface{})
-
 	for k, v := range i {
-
 		switch v.(type) {
 		case string:
-			collect[k.(string)] = Type{"string"}
+			collect[k.(string)] = T{"string", nil}
 		case int:
-			collect[k.(string)] = Type{"integer"}
+			collect[k.(string)] = T{"integer", nil}
 		case bool:
-			collect[k.(string)] = Type{"boolean"}
+			collect[k.(string)] = T{"boolean", nil}
 		case []interface{}:
-			/*
-				fmt.Printf("%s%s:\n", pad(offset), k)
-				fmt.Printf("%stype: array\n", pad(pad2(offset)))
-				fmt.Printf("%sitems:\n", pad(pad2(offset)))
-				for _, arr := range v.([]interface{}) {
-					array := make(map[interface{}]interface{})
-					array[""] = arr
-					turtle(array, pad2(offset))
-				}
-			*/
+			fmt.Printf("crap array found, more code needed type: %T", v)
 		case map[interface{}]interface{}:
-			collect[k.(string)] = Object(turtle(v.(map[interface{}]interface{})))
+			collect[k.(string)] = T{"object", turtle(v.(map[interface{}]interface{}))}
 		default:
 			fmt.Printf("unknown type: %T", v)
 		}
 	}
-
 	return collect
-}
-
-func String(name string, d map[interface{}]interface{}) map[interface{}]interface{} {
-	d[name] = Type{"string"}
-	return d
-}
-
-func Int(name string, d map[interface{}]interface{}) map[interface{}]interface{} {
-	d[name] = Type{"integer"}
-	return d
-}
-
-func Bool(name string, d map[interface{}]interface{}) map[interface{}]interface{} {
-	d[name] = Type{"boolean"}
-	return d
-}
-
-func Object(nested map[interface{}]interface{}) map[interface{}]interface{} {
-	var obj map[interface{}]interface{} = make(map[interface{}]interface{})
-	obj["type"] = "object"
-	obj["properties"] = nested
-	return obj
 }
 
 func read(file string) map[interface{}]interface{} {
@@ -137,3 +100,14 @@ func read(file string) map[interface{}]interface{} {
 
 	return data
 }
+
+/*
+	fmt.Printf("%s%s:\n", pad(offset), k)
+	fmt.Printf("%stype: array\n", pad(pad2(offset)))
+	fmt.Printf("%sitems:\n", pad(pad2(offset)))
+	for _, arr := range v.([]interface{}) {
+		array := make(map[interface{}]interface{})
+		array[""] = arr
+		turtle(array, pad2(offset))
+	}
+*/
