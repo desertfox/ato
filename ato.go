@@ -5,113 +5,135 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 )
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println(errors.New("must pass ansible yaml file name"))
-		os.Exit(1)
-	}
-
-	ansibleYamlFile := os.Args[1]
-
-	b, err := ioutil.ReadFile(ansibleYamlFile)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	prefixOpenAPI()
-
-	var ansibleData map[interface{}]interface{}
-	err = yaml.Unmarshal(b, &ansibleData)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	turtle(ansibleData, 10)
+type Type struct {
+	Type string `yaml:"type"`
 }
 
-func prefixOpenAPI() {
-	fmt.Println(`schema:
-  openAPIV3Schema:
-    type: object
-    properties:
-      spec:
-	type: object
-	properties:`)
+func main() {
+	if len(os.Args) < 3 {
+		fmt.Println(errors.New("must pass crd and ansible yaml file name"))
+		os.Exit(1)
+	}
+
+	oldCRD := read(os.Args[1])
+
+	ansiblePlaybookYaml := read(os.Args[2])
+	openapischema := turtle(ansiblePlaybookYaml)
+
+	schema := updateCRD(openapischema)
+
+	newCRD := migrateCRD(oldCRD, schema)
+
+	fmt.Printf("%v", newCRD)
+}
+
+func migrateCRD(crd map[interface{}]interface{}, openAPIschema map[interface{}]interface{}) map[interface{}]interface{} {
+	var spec map[interface{}]interface{} = crd["spec"].(map[interface{}]interface{})
+
+	delete(spec, "version")
+	delete(spec, "subresources")
+
+	versions := spec["versions"].([]interface{})[0].(map[interface{}]interface{})
+	versions["schema"] = openAPIschema
+
+	crd["apiVersion"] = "apiextensions.k8s.io/v1"
+
+	return crd
+}
+
+type O struct {
+	Type       string      `yaml:"type"`
+	Properties interface{} `yaml:"properties"`
+}
+
+func updateCRD(oas map[interface{}]interface{}) map[interface{}]interface{} {
+	var spec map[interface{}]interface{} = make(map[interface{}]interface{})
+	spec["type"] = "object"
+	spec["properties"] = oas
+
+	var openAPIschema map[interface{}]interface{} = make(map[interface{}]interface{})
+	openAPIschema["type"] = "object"
+	openAPIschema["properties"] = spec
+
+	var schema map[interface{}]interface{} = make(map[interface{}]interface{})
+	schema["openAPIV3Schema"] = openAPIschema
+
+	return schema
 }
 
 //But of course the world is flat and resting on the shell of a giant turtle.
-func turtle(i map[interface{}]interface{}, offset int) {
+func turtle(i map[interface{}]interface{}) map[interface{}]interface{} {
+	var collect map[interface{}]interface{} = make(map[interface{}]interface{})
+
 	for k, v := range i {
+
 		switch v.(type) {
 		case string:
-			String(k.(string), offset)
+			collect[k.(string)] = Type{"string"}
 		case int:
-			Int(k.(string), offset)
+			collect[k.(string)] = Type{"integer"}
 		case bool:
-			Bool(k.(string), offset)
+			collect[k.(string)] = Type{"boolean"}
 		case []interface{}:
-			fmt.Printf("%s%s:\n", pad(offset), k)
-			fmt.Printf("%stype: array\n", pad(pad2(offset)))
-			fmt.Printf("%sitems:\n", pad(pad2(offset)))
-			for _, arr := range v.([]interface{}) {
-				array := make(map[interface{}]interface{})
-				array[""] = arr
-				turtle(array, pad2(offset))
-			}
+			/*
+				fmt.Printf("%s%s:\n", pad(offset), k)
+				fmt.Printf("%stype: array\n", pad(pad2(offset)))
+				fmt.Printf("%sitems:\n", pad(pad2(offset)))
+				for _, arr := range v.([]interface{}) {
+					array := make(map[interface{}]interface{})
+					array[""] = arr
+					turtle(array, pad2(offset))
+				}
+			*/
 		case map[interface{}]interface{}:
-			Object(k.(string), offset)
-			turtle(v.(map[interface{}]interface{}), pad2(offset+2))
+			collect[k.(string)] = Object(turtle(v.(map[interface{}]interface{})))
 		default:
 			fmt.Printf("unknown type: %T", v)
 		}
 	}
+
+	return collect
 }
 
-func String(name string, offset int) {
-	if name != "" {
-		fmt.Printf("%s%s:\n", pad(offset), name)
+func String(name string, d map[interface{}]interface{}) map[interface{}]interface{} {
+	d[name] = Type{"string"}
+	return d
+}
+
+func Int(name string, d map[interface{}]interface{}) map[interface{}]interface{} {
+	d[name] = Type{"integer"}
+	return d
+}
+
+func Bool(name string, d map[interface{}]interface{}) map[interface{}]interface{} {
+	d[name] = Type{"boolean"}
+	return d
+}
+
+func Object(nested map[interface{}]interface{}) map[interface{}]interface{} {
+	var obj map[interface{}]interface{} = make(map[interface{}]interface{})
+	obj["type"] = "object"
+	obj["properties"] = nested
+	return obj
+}
+
+func read(file string) map[interface{}]interface{} {
+	b, err := ioutil.ReadFile(file)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	fmt.Printf("%stype: string\n", pad(pad2(offset)))
-}
 
-func Int(name string, offset int) {
-	if name != "" {
-		fmt.Printf("%s%s:\n", pad(offset), name)
+	var data map[interface{}]interface{}
+	err = yaml.Unmarshal(b, &data)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	fmt.Printf("%stype: integer\n", pad(pad2(offset)))
-}
 
-func Bool(name string, offset int) {
-	if name != "" {
-		fmt.Printf("%s%s:\n", pad(offset), name)
-	}
-	fmt.Printf("%stype: boolean\n", pad(pad2(offset)))
+	return data
 }
-
-func Object(name string, offset int) {
-	if name != "" {
-		fmt.Printf("%s%s:\n", pad(offset), name)
-	}
-	fmt.Printf("%stype: object\n", pad(pad2(offset)))
-	fmt.Printf("%sproperties:\n", pad(pad2(offset)))
-}
-
-func pad(i int) string {
-	return strings.Repeat(" ", i)
-}
-
-func pad2(i int) int {
-	return i + 2
-}
-
-/*
-name:
-  type: string
-*/
