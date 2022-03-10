@@ -35,7 +35,7 @@ func main() {
 
 	spec := crd["spec"].(map[interface{}]interface{})
 
-	ansiblePlaybookPath := fmt.Sprintf("./roles/%s/defaults/main.yaml", spec["names"].(map[interface{}]interface{})["singular"])
+	ansiblePlaybookPath := fmt.Sprintf("./roles/%s/defaults/main.yml", spec["names"].(map[interface{}]interface{})["singular"])
 
 	log.Printf("Loading Ansible Playbook defaults at %s\n", ansiblePlaybookPath)
 	ansiblePlaybook := read(ansiblePlaybookPath)
