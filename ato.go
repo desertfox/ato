@@ -22,10 +22,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	openapischema := make(map[interface{}]interface{})
-	for topKey, topValue := range read(os.Args[1]) {
-		openapischema[topKey] = turtle(topValue)
-	}
+	openapischema := trutles(read(os.Args[1]))
 
 	openapiObject := make(map[interface{}]interface{})
 	openapiObject["spec"] = T{"object", openapischema, nil}
@@ -53,6 +50,14 @@ func main() {
 	fmt.Println(string(b))
 }
 
+func trutles(node map[interface{}]interface{}) map[interface{}]interface{} {
+	t := make(map[interface{}]interface{})
+	for k, v := range node {
+		t[k] = turtle(v)
+	}
+	return t
+}
+
 //But of course the world is flat and resting on the shell of a giant turtle.
 func turtle(node interface{}) interface{} {
 	switch value := node.(type) {
@@ -69,11 +74,7 @@ func turtle(node interface{}) interface{} {
 		}
 		return T{"array", nil, arg}
 	case map[interface{}]interface{}:
-		var collect map[interface{}]interface{} = make(map[interface{}]interface{})
-		for k, v := range node.(map[interface{}]interface{}) {
-			collect[k] = turtle(v)
-		}
-		return collect
+		return T{"object", trutles(node.(map[interface{}]interface{})), nil}
 	default:
 		fmt.Printf("unknown type: %T", value)
 	}
