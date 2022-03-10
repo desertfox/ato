@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,30 +11,43 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+var crdPath string
+
 type T struct {
 	Type       string      `yaml:"type"`
 	Properties interface{} `yaml:"properties,omitempty"`
 	Items      interface{} `yaml:"items,omitempty"`
 }
 
+func init() {
+	flag.StringVar(&crdPath, "crd", "", "--crd=path/to/crd.yaml")
+}
+
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println(errors.New("must pass ansible and crd  file name"))
-		os.Exit(1)
+	flag.Parse()
+
+	if crdPath == "" {
+		log.Fatal(errors.New("must pass crd file path"))
 	}
 
-	openapischema := trutles(read(os.Args[1]))
-
-	openapiObject := make(map[interface{}]interface{})
-	openapiObject["spec"] = T{"object", openapischema, nil}
-
-	schema := make(map[interface{}]interface{})
-	schema["openAPIV3Schema"] = T{"object", openapiObject, nil}
-
-	crd := read(os.Args[2])
+	log.Printf("Loading CustomResourceDefinition at %s\n", crdPath)
+	crd := read(crdPath)
 
 	spec := crd["spec"].(map[interface{}]interface{})
 
+	ansiblePlaybookPath := fmt.Sprintf("./roles/%s/defaults/main.yaml", spec["names"].(map[interface{}]interface{})["singular"])
+
+	log.Printf("Loading Ansible Playbook defaults at %s\n", ansiblePlaybookPath)
+	ansiblePlaybook := read(ansiblePlaybookPath)
+
+	log.Println("Translate variables into OpenAPIv3Schema")
+	openapischema := trutles(ansiblePlaybook)
+	openapiObject := make(map[interface{}]interface{})
+	openapiObject["spec"] = T{"object", openapischema, nil}
+	schema := make(map[interface{}]interface{})
+	schema["openAPIV3Schema"] = T{"object", openapiObject, nil}
+
+	log.Println("Update CustomResourceDefinition")
 	delete(spec, "version")
 	delete(spec, "subresources")
 
@@ -42,12 +56,18 @@ func main() {
 
 	crd["apiVersion"] = "apiextensions.k8s.io/v1"
 
+	log.Printf("Write CustomResourceDefinition at %s\n", crdPath)
 	b, err := yaml.Marshal(crd)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(string(b))
+	err = ioutil.WriteFile(crdPath, b, os.FileMode(int(0777)))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Finished")
 }
 
 func trutles(node map[interface{}]interface{}) map[interface{}]interface{} {
@@ -82,15 +102,13 @@ func turtle(node interface{}) interface{} {
 func read(file string) map[interface{}]interface{} {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	var data map[interface{}]interface{}
 	err = yaml.Unmarshal(b, &data)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	return data

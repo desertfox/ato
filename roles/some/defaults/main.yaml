@@ -1,0 +1,17 @@
+one:
+  sub:
+    a: plain string
+    b: false
+  sub2:
+    a: 0
+    b: "double quoted string"
+two: plain string
+three:
+  a: plain string
+arrayFour:
+  - 
+    AFour: stringFoura
+    BFour: stringFourb
+  - 
+    AFour: stringFoura
+    BFour: stringFourb

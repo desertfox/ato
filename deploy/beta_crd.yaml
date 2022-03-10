@@ -6,7 +6,7 @@ spec:
   group: apps.potato.com
   names:
     kind: Some
-    listKind: somes
+    listKind: Somes
     plural: somes
     singular: some
   scope: Namespaced
