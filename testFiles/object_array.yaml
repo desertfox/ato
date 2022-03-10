@@ -1,5 +1,9 @@
-top:
-  - plain string
-  - 0
-  - complex:
-      name: plain string
+top: 
+  - 
+    key: "plain string"
+  - 
+    key: false
+  -
+    true
+  -
+    "plain string"

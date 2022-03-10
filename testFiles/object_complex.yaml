@@ -8,3 +8,10 @@ one:
 two: plain string
 three:
   a: plain string
+arrayFour:
+  - 
+    AFour: stringFour
+  - 
+    BFour: false
+  -
+    true

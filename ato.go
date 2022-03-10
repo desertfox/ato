@@ -11,26 +11,41 @@ import (
 )
 
 type T struct {
-	Type       string      `yaml:"type"`
-	Properties interface{} `yaml:"properties,omitempty"`
+	Type       string        `yaml:"type"`
+	Properties interface{}   `yaml:"properties,omitempty"`
+	Items      []interface{} `yaml:"items,omitempty"`
 }
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Println(errors.New("must pass crd and ansible yaml file name"))
+		fmt.Println(errors.New("must pass ansible and crd  file name"))
 		os.Exit(1)
 	}
 
-	oldCRD := read(os.Args[1])
+	openapischema := make(map[interface{}]interface{})
+	for topKey, topValue := range read(os.Args[1]) {
+		openapischema[topKey] = turtle(topValue)
+	}
 
-	ansiblePlaybookYaml := read(os.Args[2])
-	openapischema := turtle(ansiblePlaybookYaml)
+	openapiObject := make(map[interface{}]interface{})
+	openapiObject["spec"] = T{"object", openapischema, nil}
 
-	schema := updateCRD(openapischema)
+	schema := make(map[interface{}]interface{})
+	schema["openAPIV3Schema"] = T{"object", openapiObject, nil}
 
-	newCRD := migrateCRD(oldCRD, schema)
+	crd := read(os.Args[2])
 
-	b, err := yaml.Marshal(newCRD)
+	spec := crd["spec"].(map[interface{}]interface{})
+
+	delete(spec, "version")
+	delete(spec, "subresources")
+
+	versions := spec["versions"].([]interface{})[0].(map[interface{}]interface{})
+	versions["schema"] = schema
+
+	crd["apiVersion"] = "apiextensions.k8s.io/v1"
+
+	b, err := yaml.Marshal(crd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,50 +53,31 @@ func main() {
 	fmt.Println(string(b))
 }
 
-func migrateCRD(crd map[interface{}]interface{}, openAPIschema map[interface{}]interface{}) map[interface{}]interface{} {
-	var spec map[interface{}]interface{} = crd["spec"].(map[interface{}]interface{})
-
-	delete(spec, "version")
-	delete(spec, "subresources")
-
-	versions := spec["versions"].([]interface{})[0].(map[interface{}]interface{})
-	versions["schema"] = openAPIschema
-
-	crd["apiVersion"] = "apiextensions.k8s.io/v1"
-
-	return crd
-}
-
-func updateCRD(oas map[interface{}]interface{}) map[interface{}]interface{} {
-	spec := T{"object", oas}
-	openAPIschema := T{"object", spec}
-
-	var schema map[interface{}]interface{} = make(map[interface{}]interface{})
-	schema["openAPIV3Schema"] = openAPIschema
-
-	return schema
-}
-
 //But of course the world is flat and resting on the shell of a giant turtle.
-func turtle(i map[interface{}]interface{}) map[interface{}]interface{} {
-	var collect map[interface{}]interface{} = make(map[interface{}]interface{})
-	for k, v := range i {
-		switch v.(type) {
-		case string:
-			collect[k.(string)] = T{"string", nil}
-		case int:
-			collect[k.(string)] = T{"integer", nil}
-		case bool:
-			collect[k.(string)] = T{"boolean", nil}
-		case []interface{}:
-			fmt.Printf("crap array found, more code needed type: %T", v)
-		case map[interface{}]interface{}:
-			collect[k.(string)] = T{"object", turtle(v.(map[interface{}]interface{}))}
-		default:
-			fmt.Printf("unknown type: %T", v)
+func turtle(node interface{}) interface{} {
+	switch value := node.(type) {
+	case string:
+		return T{"string", nil, nil}
+	case int:
+		return T{"integer", nil, nil}
+	case bool:
+		return T{"boolean", nil, nil}
+	case []interface{}:
+		var arg []interface{}
+		for _, arr := range node.([]interface{}) {
+			arg = append(arg, turtle(arr))
 		}
+		return T{"array", nil, arg}
+	case map[interface{}]interface{}:
+		var collect map[interface{}]interface{} = make(map[interface{}]interface{})
+		for k, v := range node.(map[interface{}]interface{}) {
+			collect[k] = turtle(v)
+		}
+		return collect
+	default:
+		fmt.Printf("unknown type: %T", value)
 	}
-	return collect
+	return nil
 }
 
 func read(file string) map[interface{}]interface{} {
@@ -100,14 +96,3 @@ func read(file string) map[interface{}]interface{} {
 
 	return data
 }
-
-/*
-	fmt.Printf("%s%s:\n", pad(offset), k)
-	fmt.Printf("%stype: array\n", pad(pad2(offset)))
-	fmt.Printf("%sitems:\n", pad(pad2(offset)))
-	for _, arr := range v.([]interface{}) {
-		array := make(map[interface{}]interface{})
-		array[""] = arr
-		turtle(array, pad2(offset))
-	}
-*/
