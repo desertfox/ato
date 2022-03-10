@@ -2,8 +2,6 @@ top:
   - 
     key: "plain string"
   - 
-    key: false
+    key: "plain string"
   -
-    true
-  -
-    "plain string"
+    key: "plain string"

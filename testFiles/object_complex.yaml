@@ -10,8 +10,8 @@ three:
   a: plain string
 arrayFour:
   - 
-    AFour: stringFour
+    AFour: stringFoura
+    BFour: stringFourb
   - 
-    BFour: false
-  -
-    true
+    AFour: stringFoura
+    BFour: stringFourb

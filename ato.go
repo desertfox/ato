@@ -11,9 +11,9 @@ import (
 )
 
 type T struct {
-	Type       string        `yaml:"type"`
-	Properties interface{}   `yaml:"properties,omitempty"`
-	Items      []interface{} `yaml:"items,omitempty"`
+	Type       string      `yaml:"type"`
+	Properties interface{} `yaml:"properties,omitempty"`
+	Items      interface{} `yaml:"items,omitempty"`
 }
 
 func main() {
@@ -68,11 +68,9 @@ func turtle(node interface{}) interface{} {
 	case bool:
 		return T{"boolean", nil, nil}
 	case []interface{}:
-		var arg []interface{}
 		for _, arr := range node.([]interface{}) {
-			arg = append(arg, turtle(arr))
+			return T{"array", nil, turtle(arr)}
 		}
-		return T{"array", nil, arg}
 	case map[interface{}]interface{}:
 		return T{"object", trutles(node.(map[interface{}]interface{})), nil}
 	default:
