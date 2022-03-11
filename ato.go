@@ -85,16 +85,16 @@ func turtle(node interface{}) interface{} {
 		return T{"string", nil, nil}
 	case int:
 		return T{"integer", nil, nil}
+	case float64:
+		return T{"integer", nil, nil}
 	case bool:
 		return T{"boolean", nil, nil}
 	case []interface{}:
-		for _, arr := range node.([]interface{}) {
-			return T{"array", nil, turtle(arr)}
-		}
+		return T{"array", nil, turtle(node.([]interface{})[0])}
 	case map[interface{}]interface{}:
 		return T{"object", trutles(node.(map[interface{}]interface{})), nil}
 	default:
-		fmt.Printf("unknown type: %T", value)
+		log.Fatalf("unknown type: %T", value)
 	}
 	return nil
 }
