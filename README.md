@@ -1,3 +1,6 @@
+# **WARNING THIS IS EXPERIMENTAL**
+Tool has known bug for complex array type mappings. If your arrays are 1 dimensional and of the same Type it will work but more than 1 type will not be detected so beware.
+
 # **A**nsible Playbook **T**o **O**penAPIv3Schema
     Simple tool for creating OpenAPIv3Schema from Ansible playbook defaults/main.yml file. 
 ## Usage
